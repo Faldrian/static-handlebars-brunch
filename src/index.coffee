@@ -12,6 +12,11 @@ module.exports = class StaticHandlebarsCompiler
   constructor: (@config) ->
     @outputDirectory = @config?.plugins?.staticHandlebars?.outputDirectory || 'public'
 
+    # Load additional configuration / context from a project-specific file
+    includeFile = @config?.plugins?.staticHandlebars?.includeFile || 'staticHandlebarsExtras.js'
+    absoluteFile = sysPath.join(sysPath.resolve('./'), includeFile)
+    @extras = require(absoluteFile) if fs.existsSync(absoluteFile)
+
   withPartials: (callback) ->
     partials = {}
     errThrown = false
@@ -36,12 +41,13 @@ module.exports = class StaticHandlebarsCompiler
     try
       basename = sysPath.basename(path, ".hbs")
       template = handlebars.compile(data)
+      context = if @extras then @extras(handlebars) else {} ;
 
       @withPartials (err, partials) =>
         if err?
           callback(err)
         else
-          html = template({}, partials: partials, helpers: @makeHelpers(partials))
+          html = template(context, partials: partials, helpers: @makeHelpers(partials))
           newPath = @outputDirectory + path.slice(13, -4) + ".html"
 
           mkdirp.sync(sysPath.dirname(newPath))
